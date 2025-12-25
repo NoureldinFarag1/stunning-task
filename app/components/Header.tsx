@@ -99,12 +99,12 @@ export function Header({
           </div>
         </div>
         <a
-          href="https://github.com"
+          href="https://github.com/NoureldinFarag1/stunning-task"
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
         >
-          GitHub
+          GitHub Repo Link
         </a>
       </div>
     </header>
