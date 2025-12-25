@@ -82,7 +82,7 @@ export function Sidebar({
                   onClick={() => onLoadItem(item)}
                   className="group relative flex cursor-pointer flex-col gap-1 rounded-lg px-3 py-3 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2 ">
                     <span className="line-clamp-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       {item.idea}
                     </span>

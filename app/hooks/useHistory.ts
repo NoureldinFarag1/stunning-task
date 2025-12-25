@@ -8,32 +8,31 @@ export type HistoryItem = {
 };
 
 export function useHistory() {
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
-    if (typeof window === "undefined") {
-      return [];
-    }
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  useEffect(() => {
     const saved = localStorage.getItem("StunningTask_history");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return parsed.map(
-          (item: {
-            id: string;
-            idea: string;
-            prompt: string;
-            date: string;
-          }) => ({
-            ...item,
-            date: new Date(item.date),
-          })
+        setHistory(
+          parsed.map(
+            (item: {
+              id: string;
+              idea: string;
+              prompt: string;
+              date: string;
+            }) => ({
+              ...item,
+              date: new Date(item.date),
+            })
+          )
         );
       } catch (e) {
         console.error("Failed to parse history", e);
-        return [];
       }
     }
-    return [];
-  });
+  }, []);
 
   // Save history whenever it changes
   useEffect(() => {
