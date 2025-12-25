@@ -1,63 +1,185 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { generateWebsitePrompt, refineBlueprint } from "./actions";
+import { useHistory } from "./hooks/useHistory";
+import { useTheme } from "./hooks/useTheme";
+import { Sidebar } from "./components/Sidebar";
+import { Header } from "./components/Header";
+import { Hero } from "./components/Hero";
+import { InputForm } from "./components/InputForm";
+import { BlueprintRenderer } from "./components/BlueprintRenderer";
 
 export default function Home() {
+  // Custom Hooks
+  const { history, addToHistory, deleteHistoryItem } = useHistory();
+  const { theme, toggleTheme } = useTheme();
+
+  // Local State
+  const [idea, setIdea] = useState("");
+  const [improvedIdea, setImprovedIdea] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Refs for streaming effect
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isTypingRef = useRef(false);
+
+  // Mobile check
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) setIsSidebarOpen(false);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Handlers
+  const startNewChat = () => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      isTypingRef.current = false;
+    }
+    setIdea("");
+    setImprovedIdea("");
+    setCopied(false);
+    if (isMobile) setIsSidebarOpen(false);
+  };
+
+  const handleHistorySelect = (item: { idea: string; prompt: string }) => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      isTypingRef.current = false;
+    }
+    setIdea(item.idea);
+    setImprovedIdea(item.prompt);
+    if (isMobile) setIsSidebarOpen(false);
+  };
+
+  const handleDeleteHistoryItem = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    deleteHistoryItem(id);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!idea.trim()) return;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      isTypingRef.current = false;
+    }
+
+    setIsLoading(true);
+    setImprovedIdea("");
+
+    try {
+      const improved = await generateWebsitePrompt(idea);
+      addToHistory(idea, improved);
+      setIsLoading(false);
+
+      // Streaming effect
+      isTypingRef.current = true;
+      let currentIndex = 0;
+      const speed = 5;
+
+      const typeNextChar = () => {
+        if (!isTypingRef.current) return;
+        if (currentIndex < improved.length) {
+          setImprovedIdea(improved.slice(0, currentIndex + 1));
+          currentIndex++;
+          typingTimeoutRef.current = setTimeout(typeNextChar, speed);
+        } else {
+          isTypingRef.current = false;
+        }
+      };
+      typeNextChar();
+    } catch (error) {
+      console.error("Generation failed", error);
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefine = async (request: string) => {
+    setIsRefining(true);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      isTypingRef.current = false;
+    }
+
+    try {
+      const refined = await refineBlueprint(improvedIdea, request);
+      setImprovedIdea(refined);
+    } catch (error) {
+      console.error("Refinement failed", error);
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(improvedIdea);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([improvedIdea], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "project-blueprint.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex min-h-screen bg-zinc-50 text-zinc-900 transition-colors duration-300 dark:bg-black dark:text-zinc-100">
+      <Sidebar
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+        history={history}
+        onLoadItem={handleHistorySelect}
+        onDeleteItem={handleDeleteHistoryItem}
+        onNewChat={startNewChat}
+      />
+
+      <main className="flex-1 transition-all duration-300">
+        <Header
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          theme={theme}
+          toggleTheme={toggleTheme}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="mx-auto max-w-4xl px-6 pb-24 pt-12">
+          <Hero />
+
+          <InputForm
+            idea={idea}
+            setIdea={setIdea}
+            onSubmit={handleSubmit}
+            isLoading={isLoading}
+            onClear={() => setIdea("")}
+            hasResult={!!improvedIdea}
+          />
+
+          <BlueprintRenderer
+            content={improvedIdea}
+            onCopy={handleCopy}
+            onDownload={handleDownload}
+            copied={copied}
+            onRefine={handleRefine}
+            isRefining={isRefining}
+          />
         </div>
       </main>
     </div>
